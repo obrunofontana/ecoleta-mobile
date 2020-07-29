@@ -1,6 +1,6 @@
 import React, { useState, useEffect} from 'react';
 import { Feather as Icon } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import MapView, { Marker } from 'react-native-maps';
 import { SvgUri } from 'react-native-svg';
 import { 
@@ -20,11 +20,27 @@ interface ItemResponse {
   title: string,
   imageUrl: string
 }
+interface CollectPointsResponse {
+  id: number,
+  name: string,
+  image: string
+  latitude: number
+  longitude: number
+}
+
+interface RouteParams {
+  uf: string;
+  city: string
+}
 
 const CollectPoints: React.FC = () => {
   // Stados
   const [items, setItems] = useState<ItemResponse[]>([]);
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
+  const [collectPoints, setCollectPoints] = useState<CollectPointsResponse[]>([]);
+
+  const route = useRoute();
+  const routeParams = route.params as RouteParams;
 
   function handleSelectItem(id: number) {
     const alreadySelected = selectedItems.findIndex((item) => item === id);
@@ -44,9 +60,24 @@ const CollectPoints: React.FC = () => {
     navitagion.goBack();
   }
 
-  function handleNavigateToDetail() {
-    navitagion.navigate('Details');
+  function handleNavigateToDetail(id: number) {
+    navitagion.navigate('Details', {pointId: id});
   }
+
+  useEffect(() => {
+    api.get('collectPoints', { 
+      params: {
+        city: routeParams.city,
+        uf: routeParams.uf,
+        items: selectedItems
+      }
+    }).then((response) => {
+        setCollectPoints(response.data);
+      })
+      .catch((e) => {
+        console.log(e);
+      });
+  }, [selectedItems]);
 
   useEffect(() => {
     api.get('itemscollect')
@@ -78,19 +109,24 @@ const CollectPoints: React.FC = () => {
               longitudeDelta: 0.014
             }}
           >
-            <Marker 
-              style={styles.mapMarker}
-              coordinate={{latitude: -26.205362, longitude: -52.683848}}
-              onPress={handleNavigateToDetail}
-            >
-              <View style={styles.mapMarkerContainer}>
-                <Image  
-                  style={styles.mapMarkerImage}
-                  source={{ uri: 'https://images.unsplash.com/photo-1441123285228-1448e608f3d5?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=400&q=60'}}
-                />
-                <Text style={styles.mapMarkerTitle}>Mercado</Text>
-              </View>
-            </Marker>
+            {collectPoints.map((point) => {
+              return (
+                <Marker 
+                  key={String(point.id)}
+                  style={styles.mapMarker}
+                  coordinate={{latitude: point.latitude, longitude: point.longitude}}
+                  onPress={() => handleNavigateToDetail(point.id)}
+                >
+                  <View style={styles.mapMarkerContainer}>
+                    <Image  
+                      style={styles.mapMarkerImage}
+                      source={{ uri: point.image }}
+                    />
+                    <Text style={styles.mapMarkerTitle}>{point.name}</Text>
+                  </View>
+                </Marker>
+              );
+            })}
           </MapView>
         </View>
       </View>
